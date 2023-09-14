@@ -1,5 +1,6 @@
-module EmojiData
+# frozen_string_literal: true
 
+module EmojiData
   # EmojiChar represents a single Emoji character and its associated metadata.
   #
   # @!attribute name
@@ -9,7 +10,7 @@ module EmojiData
   # @!attribute unified
   #   @return [String] The primary unified codepoint ID for the emoji character.
   #
-  # @!attribute variations
+  # @!attribute skin_variations
   #   @return [Array<String>] A list of all variant codepoints that may also
   #     represent this emoji.
   #
@@ -28,18 +29,28 @@ module EmojiData
   #   building an automatic translation from typed emoticons.
   #
   class EmojiChar
+    attr_reader :skin_variations
+
+    # skin-tone-1 is the default and does not have a modifier
+    SKIN_TONE_MAPPING = {
+      2 => '1F3FB',
+      3 => '1F3FC',
+      4 => '1F3FD',
+      5 => '1F3FE',
+      6 => '1F3FF'
+    }.freeze
 
     def initialize(emoji_hash)
       # work around inconsistency in emoji.json for now by just setting a blank
       # array for instance value, and let it get overriden in main
       # deserialization loop if variable is present.
-      @variations = []
+      @skin_variations = []
 
       # trick for declaring instance variables while iterating over a hash
       # http://stackoverflow.com/questions/1615190/
-      emoji_hash.each do |k,v|
-        instance_variable_set("@#{k}",v)
-        eigenclass = class<<self; self; end
+      emoji_hash.each do |k, v|
+        instance_variable_set("@#{k}", v)
+        eigenclass = class << self; self; end
         eigenclass.class_eval { attr_reader k }
       end
     end
@@ -47,21 +58,37 @@ module EmojiData
     # Renders an `EmojiChar` to its string glyph representation, suitable for
     # printing to screen.
     #
-    # @option opts [Boolean] :variant_encoding specify whether the variant
+    # @skin_tone [Integer] :variant_encoding specify whether the variant
     #   encoding selector should be used to hint to rendering devices that
     #   "graphic" representation should be used. By default, we use this for all
     #   Emoji characters that contain a possible variant.
     #
     # @return [String] the emoji character rendered to a UTF-8 string
-    def render(opts = {})
-      options = {variant_encoding: true}.merge(opts)
-      #decide whether to use the normal unified ID or the variant for encoding to str
-      target = (self.variant? && options[:variant_encoding]) ? self.variant : @unified
-      EmojiChar::unified_to_char(target)
+    def render(skin_tone: nil)
+      variant = if skin_tone.nil? || skin_tone == 1
+                  unified
+                else
+                  skin_tone_unicode = SKIN_TONE_MAPPING[skin_tone]
+                  skin_variations.dig(skin_tone_unicode, 'unified')
+                end
+
+      return if variant.nil?
+
+      EmojiChar.unified_to_char(variant)
     end
 
-    alias_method :to_s, :render
-    alias_method :char, :render
+    # Returns the unified code of the emoji
+    #
+    # @skin_tone [Integer] :variant_encoding specify whether we should
+    #   return the default unified or a skin variation one.
+    #
+    # @return String : the unified code
+    def unified_code(skin_tone: nil)
+      return unified if skin_tone.nil? || skin_tone == 1
+
+      skin_tone_unicode = SKIN_TONE_MAPPING[skin_tone]
+      skin_variations.dig(skin_tone_unicode, 'unified')
+    end
 
     # Returns a list of all possible UTF-8 string renderings of an `EmojiChar`.
     #
@@ -71,51 +98,33 @@ module EmojiData
     #
     # @return [Array<String>] all possible UTF-8 string renderings
     def chars
-      results = [self.render({variant_encoding: false})]
-      @variations.each do |variation|
-        results << EmojiChar::unified_to_char(variation)
+      results = [EmojiChar.unified_to_char(unified)]
+      @skin_variations.each do |_key, value|
+        results << EmojiChar.unified_to_char(value['unified'])
       end
       @chars ||= results
     end
 
-    # Is the `EmojiChar` represented by a doublebyte codepoint in Unicode?
+    # Is the `EmojiChar` represented by a multibyte codepoint in Unicode?
     #
     # @return [Boolean]
-    def doublebyte?
-      @unified.include? "-"
+    def multibyte?
+      @unified.include? '-'
     end
 
     # Does the `EmojiChar` have an alternate Unicode variant encoding?
     #
     # @return [Boolean]
-    def variant?
-      @variations.length > 0
+    def variations?
+      !@skin_variations.empty?
     end
-
-    # Returns the most likely variant-encoding codepoint ID for an `EmojiChar`.
-    #
-    # For now we only know of one possible variant encoding for certain
-    # characters, but there could be others in the future.
-    #
-    # This is typically used to force Emoji rendering for characters that could
-    # be represented in standard font glyphs on certain operating systems.
-    #
-    # The resulting encoded string will be two codepoints, or three codepoints
-    # for doublebyte Emoji characters.
-    #
-    # @return [String, nil]
-    #   The most likely variant-encoding codepoint ID.
-    #   If there is no variant-encoding for a character, returns nil.
-    def variant
-      @variations.first
-    end
-
-
-    protected
 
     def self.unified_to_char(cps)
-      cps.split('-').map { |i| i.hex }.pack("U*")
+      cps.split('-').map { |cp| cp.to_i(16) }.pack('U*')
     end
 
+    def self.char_to_unified(char)
+      char.codepoints.to_a.map { |i| i.to_s(16).rjust(4, '0') }.join('-').upcase
+    end
   end
 end
