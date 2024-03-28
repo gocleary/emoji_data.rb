@@ -4,8 +4,8 @@ require 'spec_helper'
 
 RSpec.describe EmojiData do # rubocop:disable Metrics/BlockLength
   describe '.all' do
-    it 'should return an array of all 1875 known emoji chars (variations not included)' do
-      EmojiData.all.count.should eq(1875)
+    it 'should return an array of all 1903 known emoji chars (variations not included)' do
+      EmojiData.all.count.should eq(1903)
     end
     it 'should return all EmojiChar objects' do
       EmojiData.all.all? { |char| char.instance_of?(EmojiData::EmojiChar) }.should be_true
@@ -13,14 +13,14 @@ RSpec.describe EmojiData do # rubocop:disable Metrics/BlockLength
   end
 
   describe '.all_multibyte' do
-    it 'should return an array of all 700 known emoji chars with multibyte encoding' do
-      EmojiData.all_multibyte.count.should eq(700)
+    it 'should return an array of all 728 known emoji chars with multibyte encoding' do
+      EmojiData.all_multibyte.count.should eq(728)
     end
   end
 
   describe '.all_with_variations' do
-    it 'should return an array of all 305 known emoji chars with skin variations' do
-      EmojiData.all_with_variations.count.should eq(305)
+    it 'should return an array of all 323 known emoji chars with skin variations' do
+      EmojiData.all_with_variations.count.should eq(323)
     end
   end
 
@@ -34,8 +34,8 @@ RSpec.describe EmojiData do # rubocop:disable Metrics/BlockLength
     end
 
     context 'include_variants: true' do
-      it 'should all know 3660 emojis including variants' do
-        expect(EmojiData.chars(include_variants: true).count).to eq(3660)
+      it 'should all know 3778 emojis including variants' do
+        expect(EmojiData.chars(include_variants: true).count).to eq(3778)
       end
 
       it 'should not have any duplicates in list when variants are included' do
